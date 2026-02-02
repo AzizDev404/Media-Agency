@@ -24,7 +24,7 @@ export function WorkSection() {
 
         <div
           data-vertical-scroll
-          className="h-82 space-y-6 overflow-y-auto pr-2 sm:h-90 md:h-106 md:space-y-8"
+          className="space-y-6 overflow-visible pr-0 md:h-106 md:space-y-8 md:overflow-y-auto md:pr-2"
         >
           {[
             {
