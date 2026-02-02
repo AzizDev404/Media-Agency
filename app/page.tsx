@@ -13,6 +13,7 @@ export default function Home() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [currentSection, setCurrentSection] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(true)
   const touchStartY = useRef(0)
   const touchStartX = useRef(0)
   const shaderContainerRef = useRef<HTMLDivElement>(null)
@@ -48,18 +49,35 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)")
+    const updateMatch = () => setIsDesktop(mediaQuery.matches)
+    updateMatch()
+    mediaQuery.addEventListener("change", updateMatch)
+    return () => mediaQuery.removeEventListener("change", updateMatch)
+  }, [])
+
   const scrollToSection = (index: number) => {
     if (scrollContainerRef.current) {
-      const sectionWidth = scrollContainerRef.current.offsetWidth
-      scrollContainerRef.current.scrollTo({
-        left: sectionWidth * index,
-        behavior: "smooth",
-      })
+      if (isDesktop) {
+        const sectionWidth = scrollContainerRef.current.offsetWidth
+        scrollContainerRef.current.scrollTo({
+          left: sectionWidth * index,
+          behavior: "smooth",
+        })
+      } else {
+        const sectionHeight = scrollContainerRef.current.offsetHeight
+        scrollContainerRef.current.scrollTo({
+          top: sectionHeight * index,
+          behavior: "smooth",
+        })
+      }
       setCurrentSection(index)
     }
   }
 
   useEffect(() => {
+    if (!isDesktop) return
     const handleTouchStart = (e: TouchEvent) => {
       touchStartY.current = e.touches[0].clientY
       touchStartX.current = e.touches[0].clientX
@@ -100,9 +118,10 @@ export default function Home() {
         container.removeEventListener("touchend", handleTouchEnd)
       }
     }
-  }, [currentSection])
+  }, [currentSection, isDesktop])
 
   useEffect(() => {
+    if (!isDesktop) return
     const handleWheel = (e: WheelEvent) => {
       const target = e.target as HTMLElement | null
       if (target?.closest("[data-vertical-scroll]")) {
@@ -136,9 +155,10 @@ export default function Home() {
         container.removeEventListener("wheel", handleWheel)
       }
     }
-  }, [currentSection])
+  }, [currentSection, isDesktop])
 
   useEffect(() => {
+    if (!isDesktop) return
     const handleScroll = () => {
       if (scrollThrottleRef.current) return
 
@@ -173,7 +193,7 @@ export default function Home() {
         cancelAnimationFrame(scrollThrottleRef.current)
       }
     }
-  }, [currentSection])
+  }, [currentSection, isDesktop])
 
   return (
     <main className="relative h-screen w-full overflow-hidden bg-background">
@@ -257,13 +277,13 @@ export default function Home() {
       <div
         ref={scrollContainerRef}
         data-scroll-container
-        className={`relative z-10 flex h-screen overflow-x-auto overflow-y-hidden transition-opacity duration-700 ${
+        className={`relative z-10 flex h-screen flex-col overflow-y-auto overflow-x-hidden transition-opacity duration-700 md:flex-row md:overflow-x-auto md:overflow-y-hidden ${
           isLoaded ? "opacity-100" : "opacity-0"
         }`}
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {/* Hero Section */}
-        <section className="flex min-h-screen w-screen shrink-0 flex-col justify-end px-4 pb-14 pt-20 sm:px-6 sm:pt-24 md:px-12 md:pb-24">
+        <section className="flex min-h-screen w-full shrink-0 flex-col justify-end px-4 pb-14 pt-20 sm:px-6 sm:pt-24 md:w-screen md:px-12 md:pb-24">
           <div className="max-w-xl sm:max-w-2xl md:max-w-3xl">
             <div className="mb-4 inline-block animate-in fade-in slide-in-from-bottom-4 rounded-full border border-foreground/20 bg-foreground/15 px-3 py-1.5 backdrop-blur-md duration-700 sm:px-4">
               <p className="font-mono text-[10px] text-foreground/90 sm:text-xs">
@@ -301,7 +321,7 @@ export default function Home() {
 
         <WorkSection />
         <ServicesSection />
-        <section className="flex h-screen w-screen shrink-0 snap-start items-center px-4 pt-16 sm:px-6 sm:pt-20 md:px-12 md:pt-0 lg:px-16">
+        <section className="flex min-h-screen w-full shrink-0 snap-start items-start px-4 pt-16 sm:px-6 sm:pt-20 md:h-screen md:w-screen md:items-center md:px-12 md:pt-0 lg:px-16">
           <div className="mx-auto w-full max-w-7xl">
             <div className="mb-10 transition-all duration-700 md:mb-16">
               <h2 className="mb-2 font-sans text-3xl font-light tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">

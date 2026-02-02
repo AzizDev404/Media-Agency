@@ -8,7 +8,7 @@ export function WorkSection() {
   return (
     <section
       ref={ref}
-      className="flex h-screen w-screen shrink-0 snap-start items-center px-6 pt-20 md:px-12 md:pt-0 lg:px-16"
+      className="flex min-h-screen w-full shrink-0 snap-start items-start px-4 pt-16 sm:px-6 sm:pt-20 md:h-screen md:w-screen md:items-center md:px-12 md:pt-0 lg:px-16"
     >
       <div className="mx-auto w-full max-w-7xl">
         <div
