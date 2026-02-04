@@ -2,7 +2,7 @@
 
 import { Mail, MapPin } from "lucide-react"
 import { useReveal } from "@/hooks/use-reveal"
-import { useState, type FormEvent } from "react"
+import { useState, useRef, type FormEvent } from "react"
 import { MagneticButton } from "@/components/magnetic-button"
 
 export function ContactSection() {
@@ -11,24 +11,136 @@ export function ContactSection() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
+  // --- Phone helpers & caret-aware handlers ---
+  // local digits only (max 9) — this makes editing easier
+  const [phoneLocal, setPhoneLocal] = useState("")
+  const phoneInputRef = useRef<HTMLInputElement | null>(null)
+
+  const extractLocalDigits = (value: string) => {
+    const digits = value.replace(/\D/g, "")
+    if (digits.startsWith("998")) return digits.slice(3)
+    return digits
+  }
+
+  const formatUzPhone = (localDigits: string) => {
+    const d = localDigits.slice(0, 9) // max 9 digits
+    if (d.length === 0) return "+998 "
+
+    const p1 = d.slice(0, 2)
+    const p2 = d.slice(2, 5)
+    const p3 = d.slice(5, 7)
+    const p4 = d.slice(7, 9)
+
+    let res = "+998 "
+    res += "(" + p1
+    if (d.length >= 2) res += ")"
+    if (p2) res += "-" + p2
+    if (p3) res += "-" + p3
+    if (p4) res += "-" + p4
+
+    return res
+  }
+
+  const buildFormattedWithPositions = (localDigits: string) => {
+    const formatted = formatUzPhone(localDigits)
+    const digitPositions: number[] = []
+    for (let i = 0, di = 0; i < formatted.length && di < localDigits.length; i++) {
+      if (/\d/.test(formatted[i])) {
+        digitPositions.push(i)
+        di++
+      }
+    }
+    return { formatted, digitPositions }
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const local = extractLocalDigits(e.target.value).slice(0, 9)
+    setPhoneLocal(local)
+  }
+
+  const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text')
+    const local = extractLocalDigits(text).slice(0, 9)
+    setPhoneLocal(local)
+    requestAnimationFrame(() => {
+      const { formatted } = buildFormattedWithPositions(local)
+      const pos = formatted.length
+      phoneInputRef.current?.setSelectionRange(pos, pos)
+    })
+  }
+
+  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    const selStart = input.selectionStart ?? 0
+    const selEnd = input.selectionEnd ?? 0
+    const { formatted, digitPositions } = buildFormattedWithPositions(phoneLocal)
+
+    const digitIndexAt = (cursor: number) => digitPositions.filter((p) => p < cursor).length
+    const startDigit = digitIndexAt(selStart)
+    const endDigit = digitIndexAt(selEnd)
+
+    // Helper to update local digits and restore caret near startDigit
+    const updateAndPlaceCaret = (newLocal: string, caretDigitIndex: number) => {
+      setPhoneLocal(newLocal)
+      requestAnimationFrame(() => {
+        const { formatted: f2, digitPositions: dp2 } = buildFormattedWithPositions(newLocal)
+        const pos = dp2[caretDigitIndex] ?? f2.length
+        phoneInputRef.current?.setSelectionRange(pos, pos)
+      })
+    }
+
+    if (e.key === 'Backspace') {
+      e.preventDefault()
+      if (selStart !== selEnd) {
+        // delete selection
+        const newLocal = phoneLocal.slice(0, startDigit) + phoneLocal.slice(endDigit)
+        updateAndPlaceCaret(newLocal, startDigit)
+      } else {
+        const delIndex = startDigit - 1
+        if (delIndex >= 0) {
+          const newLocal = phoneLocal.slice(0, delIndex) + phoneLocal.slice(delIndex + 1)
+          updateAndPlaceCaret(newLocal, delIndex)
+        }
+      }
+    }
+
+    if (e.key === 'Delete') {
+      e.preventDefault()
+      if (selStart !== selEnd) {
+        const newLocal = phoneLocal.slice(0, startDigit) + phoneLocal.slice(endDigit)
+        updateAndPlaceCaret(newLocal, startDigit)
+      } else {
+        const delIndex = startDigit
+        if (delIndex < phoneLocal.length) {
+          const newLocal = phoneLocal.slice(0, delIndex) + phoneLocal.slice(delIndex + 1)
+          updateAndPlaceCaret(newLocal, delIndex)
+        }
+      }
+    }
+  }
+  // ---------------------------------------------------------------
+
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    // Basic validation
-    if (!formData.name || !formData.email || !formData.phone || !formData.message) {
+    // Basic validation: ensure all fields present and phoneLocal has exactly 9 digits
+    if (!formData.name || !formData.email || phoneLocal.length !== 9 || !formData.message) {
       return
     }
 
     setIsSubmitting(true)
 
     const subject = `Yangi xabar: ${formData.name}`
-    const body = `Ism: ${formData.name}\nEmail: ${formData.email}\nTelefon: ${formData.phone}\n\nXabar:\n${formData.message}`
+    const formattedPhone = formatUzPhone(phoneLocal)
+    const body = `Ism: ${formData.name}\nEmail: ${formData.email}\nTelefon: ${formattedPhone}\n\nXabar:\n${formData.message}`
     const mailto = `mailto:abuishoq30@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
     window.location.href = mailto
 
     setIsSubmitting(false)
     setSubmitSuccess(true)
     setFormData({ name: "", email: "", phone: "", message: "" })
+    setPhoneLocal("")
 
     // Reset success message after 5 seconds
     setTimeout(() => setSubmitSuccess(false), 5000)
@@ -162,9 +274,19 @@ export function ContactSection() {
                   Telefon raqami
                 </label>
                 <input
+                  ref={phoneInputRef}
                   type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  value={formatUzPhone(phoneLocal)}
+                  onChange={handlePhoneChange}
+                  onKeyDown={handlePhoneKeyDown}
+                  onPaste={handlePhonePaste}
+                  onFocus={() => {
+                    requestAnimationFrame(() => {
+                      const { formatted } = buildFormattedWithPositions(phoneLocal)
+                      const pos = formatted.length
+                      phoneInputRef.current?.setSelectionRange(pos, pos)
+                    })
+                  }}
                   required
                   className="w-full border-b border-foreground/30 bg-transparent py-1.5 text-xs text-foreground placeholder:text-foreground/40 focus:border-foreground/50 focus:outline-none sm:text-sm md:py-2 md:text-base"
                   placeholder="+998 90 123 45 67"
